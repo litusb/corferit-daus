@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Corferit</title>
+<style>
+  body { font-family: sans-serif; background: #222; color: #eee; text-align: center; padding: 20px; }
+  .btn { margin: 10px; padding: 12px 22px; background: #444; color: #fff; border: none; border-radius: 10px; font-size: 20px; cursor: pointer; }
+  #result { margin-top: 20px; font-size: 26px; }
+  #history { margin-top: 20px; text-align: left; width: 320px; margin-left: auto; margin-right: auto; max-height: 200px; overflow-y: auto; }
+  .esperança { color: #FFD700; font-weight: bold; }
+  .por { color: #800080; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>🎲 Corferit</h1>
+
+<button class="btn" onclick="rollDuality(0)">D-</button><button class="btn" onclick="rollDuality()">⬡⬢</button><button class="btn" onclick="rollDuality(1)">A+</button>
+
+<div id="result"></div>
+
+<h3>Historial</h3>
+<div id="history"></div>
+
+<script>
+  const history = [];
+
+  function rollD12() {
+    return Math.floor(Math.random() * 12) + 1;
+  }
+
+  function rollD6() {
+    return Math.floor(Math.random() * 6) + 1;
+  }
+
+  function rollDuality(v) {
+    const esperança = rollD12();
+    const por = rollD12();
+    const d6 = rollD6();
+
+    let winner = "";
+    let colorClass = "";
+
+    if (esperança >= por) {
+      winner = "Esperança (Hope)";
+      colorClass = "esperança";
+    } else {
+      winner = "Por (Fear)";
+      colorClass = "por";
+    }
+
+    let final = esperança + por;
+    let extra = "";
+
+    if (v === 1) {
+      final += d6;
+      extra = ` | +⚅ ${d6}`;
+    } else if (v === 0) {
+      final -= d6;
+      extra = ` | -⚅ ${d6}`;
+    }
+
+    const text = `
+      <div>
+        ⬡ ${esperança} | ⬢ ${por}${extra}<br>
+        <strong>${final}</strong> amb <span class="${colorClass}">${winner}</span>.
+      </div>
+    `;
+
+    document.getElementById("result").innerHTML = text;
+
+    history.unshift(text);
+    if (history.length > 20) history.pop();
+    document.getElementById("history").innerHTML = history.join("<hr>");
+  }
+</script>
+
+
+</body>
+</html>
