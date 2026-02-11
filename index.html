@@ -4,136 +4,126 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Corferit</title>
+
 <style>
   body { font-family: sans-serif; background: #222; color: #eee; text-align: center; padding: 20px; }
   .btn { margin: 10px; padding: 12px 22px; background: #444; color: #fff; border: none; border-radius: 10px; font-size: 20px; cursor: pointer; }
   #result { margin-top: 20px; font-size: 26px; }
-  #history { margin-top: 20px; text-align: left; width: 320px; margin-left: auto; margin-right: auto; max-height: 200px; overflow-y: auto; }
+  #history { margin-top: 20px; text-align: left; width: 320px; margin-left: auto; margin-right: auto; max-height: 300px; overflow-y: auto; }
   .esperança { color: #FFD700; font-weight: bold; }
   .por { color: #800080; font-weight: bold; }
 </style>
 </head>
+
 <body>
+
+<h1>🎲 Corferit</h1>
+
+<input id="playerName" placeholder="Tu nombre" style="padding:8px;margin-bottom:10px">
+
+<br>
+
+<button class="btn" onclick="rollDuality(0)">D-</button>
+<button class="btn" onclick="rollDuality()">⬡⬢</button>
+<button class="btn" onclick="rollDuality(1)">A+</button>
+
+<div id="result"></div>
+
+<h3>Historial compartido</h3>
+<div id="history"></div>
+
 <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
 
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyCLRBsJDKcv9I0hf3uosB0F3w7rXWU-40A",
-    authDomain: "corferit-daus.firebaseapp.com",
-    projectId: "corferit-daus",
-    storageBucket: "corferit-daus.firebasestorage.app",
-    messagingSenderId: "756634249064",
-    appId: "1:756634249064:web:8e09d8bf75aebcb1b118dd"
-  };
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy }
+from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-</script>
-<script type="module">
-// import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyCLRBsJDKcv9I0hf3uosB0F3w7rXWU-40A",
+  authDomain: "corferit-daus.firebaseapp.com",
+  projectId: "corferit-daus",
+  storageBucket: "corferit-daus.firebasestorage.app",
+  messagingSenderId: "756634249064",
+  appId: "1:756634249064:web:8e09d8bf75aebcb1b118dd"
+};
 
-// const firebaseConfig = {
-//   apiKey: "TU_API_KEY",
-//   projectId: "TU_PROJECT_ID"
-// };
-
-// const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// referencia a la sala
 const rollsRef = collection(db, "rooms/sala-1/rolls");
 
-async function sendRoll(player, result) {
+// escuchar en tiempo real
+const q = query(rollsRef, orderBy("time", "desc"));
+
+onSnapshot(q, (snapshot) => {
+  const historyDiv = document.getElementById("history");
+  historyDiv.innerHTML = "";
+
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    historyDiv.innerHTML += `<div>${data.text}</div><hr>`;
+  });
+});
+
+// enviar tirada a Firestore
+async function sendRoll(text) {
+  const player = document.getElementById("playerName").value || "Anónimo";
+
   await addDoc(rollsRef, {
-    player,
-    result,
+    player: player,
+    text: `<strong>${player}</strong><br>${text}`,
     time: Date.now()
   });
 }
 
-onSnapshot(rollsRef, snapshot => {
-  snapshot.docChanges().forEach(change => {
-    if (change.type === "added") {
-      console.log(change.doc.data());
-    }
-  });
-});
-</script>
+// funciones globales
+window.rollD12 = function() {
+  return Math.floor(Math.random() * 12) + 1;
+}
 
-<h1>🎲 Corferit</h1>
+window.rollD6 = function() {
+  return Math.floor(Math.random() * 6) + 1;
+}
 
-<button class="btn" onclick="rollDuality(0)">D-</button><button class="btn" onclick="rollDuality()">⬡⬢</button><button class="btn" onclick="rollDuality(1)">A+</button>
+window.rollDuality = async function(v) {
 
-<div id="result"></div>
+  const esperança = rollD12();
+  const por = rollD12();
+  const d6 = rollD6();
 
-<h3>Historial</h3>
-<div id="history"></div>
+  let winner = "";
+  let final = esperança + por;
+  let colorClass = "";
 
-<script>
-  const history = [];
-
-  function rollD12() {
-    return Math.floor(Math.random() * 12) + 1;
+  if (esperança >= por) {
+    winner = "Esperança";
+    colorClass = "esperança";
+  } else {
+    winner = "Por";
+    colorClass = "por";
   }
 
-  function rollD6() {
-    return Math.floor(Math.random() * 6) + 1;
+  let modifierText = "";
+
+  if (v == 1) {
+    final += d6;
+    modifierText = ` | +⚅ ${d6}`;
+  } else if (v == 0) {
+    final -= d6;
+    modifierText = ` | -⚅ ${d6}`;
   }
 
-  function rollDuality(v) {
-    const esperança = rollD12();
-    const por = rollD12();
-    const d6 = rollD6();
+  const text = `
+    ⬡ ${esperança} | ⬢ ${por}${modifierText}<br>
+    <strong>${final}</strong> amb <span class="${colorClass}">${winner}</span>.
+  `;
 
-    let winner = "";
-    let final = 0;
-    let colorClass = "";
+  document.getElementById("result").innerHTML = text;
 
-    if (esperança >= por) {
-      winner = "Esperança (Hope)";
-      colorClass = "esperança";
-    } else {
-      winner = "Por (Fear)";
-      colorClass = "por";
-    }
+  await sendRoll(text);
+}
 
-    final = esperança + por;
-
-    const text = `
-      <div>
-        ⬡ ${esperança} | ⬢ ${por}<br>
-        <strong>${final}</strong> amb <span class="${colorClass}">${winner}</span>.
-      </div>
-    `;
-
-    if (v == 1) {
-      final += d6;
-          const text = `
-            <div>
-              ⬡ ${esperança} | ⬢ ${por} | +⚅ ${d6} <br>
-              <strong>${final}</strong> amb <span class="${colorClass}">${winner}</span>.
-            </div>
-          `;
-    } else if (v == 0) {
-      final -= d6;
-          const text = `
-            <div>
-              ⬡ ${esperança} | ⬢ ${por} | -⚅ ${d6} <br>
-              <strong>${final}</strong> amb <span class="${colorClass}">${winner}</span>.
-            </div>
-          `;
-    }
-
-    document.getElementById("result").innerHTML = text;
-
-    history.unshift(text);
-    if (history.length > 20) history.pop(); // limita el histórico
-    document.getElementById("history").innerHTML = history.join("<hr>");
-  }
 </script>
 
 </body>
