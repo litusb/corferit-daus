@@ -6,12 +6,15 @@
 <title>Corferit</title>
 
 <style>
-  body { font-family: sans-serif; background: #222; color: #eee; text-align: center; padding: 20px; }
-  .btn { margin: 10px; padding: 12px 22px; background: #444; color: #fff; border: none; border-radius: 10px; font-size: 20px; cursor: pointer; }
-  #result { margin-top: 20px; font-size: 26px; }
-  #history { margin-top: 20px; text-align: left; width: 320px; margin-left: auto; margin-right: auto; max-height: 300px; overflow-y: auto; }
-  .esperança { color: #FFD700; font-weight: bold; }
-  .por { color: #800080; font-weight: bold; }
+body { font-family: sans-serif; background: #222; color: #eee; text-align: center; padding: 20px; }
+.btn { margin: 10px; padding: 12px 22px; background: #444; color: #fff; border: none; border-radius: 10px; font-size: 20px; cursor: pointer; }
+#result { margin-top: 20px; font-size: 26px; }
+#history { margin-top: 20px; text-align: left; width: 320px; margin-left: auto; margin-right: auto; max-height: 300px; overflow-y: auto; }
+.esperança { color: #FFD700; font-weight: bold; }
+.por { color: #800080; font-weight: bold; }
+#roomLabel { opacity: 0.7; margin-bottom: 10px; }
+#loginBox input { padding:8px; margin:5px; width:200px; }
+#loginBox { margin-bottom: 20px; }
 </style>
 </head>
 
@@ -19,9 +22,16 @@
 
 <h1>🎲 Corferit</h1>
 
-<input id="playerName" placeholder="Tu nombre" style="padding:8px;margin-bottom:10px">
+<div id="loginBox">
+  <input type="email" id="email" placeholder="Email"><br>
+  <input type="password" id="password" placeholder="Contraseña"><br>
+  <button class="btn" onclick="login()">Entrar</button>
+</div>
 
-<br>
+<div id="app" style="display:none;">
+
+<div id="roomLabel"></div>
+<input id="playerName" placeholder="Tu nombre" style="padding:8px;margin-bottom:10px"><br>
 
 <button class="btn" onclick="rollDuality(0)">D-</button>
 <button class="btn" onclick="rollDuality()">⬡⬢</button>
@@ -32,12 +42,21 @@
 <h3>Historial compartido</h3>
 <div id="history"></div>
 
+<br>
+<button class="btn" onclick="logout()">Cerrar sesión</button>
+
+</div>
+
 <script type="module">
 
+// 🔹 Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy }
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
+from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 
+// 🔹 Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCLRBsJDKcv9I0hf3uosB0F3w7rXWU-40A",
   authDomain: "corferit-daus.firebaseapp.com",
@@ -49,45 +68,66 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-// referencia a la sala
-const rollsRef = collection(db, "rooms/sala-1/rolls");
+// 🔹 Sala desde URL
+function getRoomFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("room") || "sala-general";
+}
 
-// escuchar en tiempo real
+const roomName = getRoomFromURL();
+document.getElementById("roomLabel").innerText = "Sala: " + roomName;
+
+const rollsRef = collection(db, `rooms/${roomName}/rolls`);
 const q = query(rollsRef, orderBy("time", "desc"));
 
-onSnapshot(q, (snapshot) => {
-  const historyDiv = document.getElementById("history");
-  historyDiv.innerHTML = "";
+// 🔐 LOGIN
+window.login = async function() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    historyDiv.innerHTML += `<div>${data.text}</div><hr>`;
-  });
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    alert("Error de login: " + error.message);
+  }
+}
+
+// 🔐 LOGOUT
+window.logout = async function() {
+  await signOut(auth);
+}
+
+// 🔐 Estado de autenticación
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    startApp();
+  } else {
+    document.getElementById("loginBox").style.display = "block";
+    document.getElementById("app").style.display = "none";
+  }
 });
 
-// enviar tirada a Firestore
-async function sendRoll(text) {
-  const player = document.getElementById("playerName").value || "Anónimo";
-
-  await addDoc(rollsRef, {
-    player: player,
-    text: `<strong>${player}</strong><br>${text}`,
-    time: Date.now()
+// 🔹 Firestore en tiempo real
+function startApp() {
+  onSnapshot(q, (snapshot) => {
+    const historyDiv = document.getElementById("history");
+    historyDiv.innerHTML = "";
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      historyDiv.innerHTML += `<div>${data.text}</div><hr>`;
+    });
   });
 }
 
-// funciones globales
-window.rollD12 = function() {
-  return Math.floor(Math.random() * 12) + 1;
-}
-
-window.rollD6 = function() {
-  return Math.floor(Math.random() * 6) + 1;
-}
+// 🎲 Dados
+window.rollD12 = function() { return Math.floor(Math.random() * 12) + 1; }
+window.rollD6 = function() { return Math.floor(Math.random() * 6) + 1; }
 
 window.rollDuality = async function(v) {
-
   const esperança = rollD12();
   const por = rollD12();
   const d6 = rollD6();
@@ -105,26 +145,18 @@ window.rollDuality = async function(v) {
   }
 
   let modifierText = "";
+  if (v == 1) { final += d6; modifierText = ` | +⚅ ${d6}`; }
+  else if (v == 0) { final -= d6; modifierText = ` | -⚅ ${d6}`; }
 
-  if (v == 1) {
-    final += d6;
-    modifierText = ` | +⚅ ${d6}`;
-  } else if (v == 0) {
-    final -= d6;
-    modifierText = ` | -⚅ ${d6}`;
-  }
+  const player = document.getElementById("playerName").value || auth.currentUser.email;
 
-  const text = `
-    ⬡ ${esperança} | ⬢ ${por}${modifierText}<br>
-    <strong>${final}</strong> amb <span class="${colorClass}">${winner}</span>.
-  `;
+  const text = `<strong>${player}</strong><br>⬡ ${esperança} | ⬢ ${por}${modifierText}<br><strong>${final}</strong> amb <span class="${colorClass}">${winner}</span>.`;
 
   document.getElementById("result").innerHTML = text;
 
-  await sendRoll(text);
+  await addDoc(rollsRef, { text: text, time: Date.now() });
 }
 
 </script>
-
 </body>
 </html>
