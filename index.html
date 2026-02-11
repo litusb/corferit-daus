@@ -118,7 +118,7 @@ document.getElementById("roomLabel").innerText = "Sala: " + roomName;
 
 const rollsRef = collection(db, `rooms/${roomName}/rolls`);
 const usersRef = collection(db, `rooms/${roomName}/users`);
-const djRef = doc(db, `rooms/${roomName}/dj`);
+const roomRef = doc(db, `rooms/${roomName}`);
 const maxRolls = 50;
 
 // 🔐 LOGIN
@@ -143,15 +143,21 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("loginBox").style.display="none";
     document.getElementById("app").style.display="block";
 
-    // Registrar usuario en Firestore
     const userRef = doc(usersRef,user.uid);
     const playerName = document.getElementById("playerName").value || user.email;
+
     const userDoc = await getDoc(userRef);
     if(!userDoc.exists()){
-      await updateDoc(doc(db,"dummy"),{}).catch(()=>{}); // workaround para crear DB
       await addDoc(usersRef,{name:playerName,hopePoints:0,connected:true,lastSeen:Date.now()});
     } else {
       await updateDoc(userRef,{connected:true,lastSeen:Date.now(),name:playerName});
+    }
+
+    // Crear documento de sala con DJ si no existe
+    const roomDoc = await getDoc(roomRef);
+    if(!roomDoc.exists()){
+      await updateDoc(doc(db,"dummy"),{}).catch(()=>{}); // workaround
+      await updateDoc(roomRef,{djFearPoints:0}).catch(async ()=>{await setDoc(roomRef,{djFearPoints:0});});
     }
 
     startApp();
@@ -186,9 +192,9 @@ function startApp(){
   });
 
   // DJ puntos
-  onSnapshot(djRef, snapshot=>{
-    const djData = snapshot.data();
-    document.getElementById("djPoints").innerText = djData ? djData.fearPoints||0 : 0;
+  onSnapshot(roomRef, snapshot=>{
+    const roomData = snapshot.data();
+    document.getElementById("djPoints").innerText = roomData ? roomData.djFearPoints||0 : 0;
   });
 
 }
@@ -221,7 +227,7 @@ window.rollDuality = async function(v){
     await updateDoc(userRef,{hopePoints: increment(1)});
   }
   if(winner==="por"){
-    await updateDoc(djRef,{fearPoints: increment(1)});
+    await updateDoc(roomRef,{djFearPoints: increment(1)});
   }
 
   // Texto tirada
@@ -240,13 +246,6 @@ window.rollDuality = async function(v){
   // Guardar tirada
   await addDoc(rollsRef,{text:text,time:Date.now()});
 
-  // Limitar historial
-  const snapshot = await rollsRef.get();
-  if(snapshot.size>maxRolls){
-    const batch = db.batch();
-    snapshot.docs.slice(maxRolls).forEach(doc=>batch.delete(doc.ref));
-    await batch.commit();
-  }
 }
 </script>
 </body>
