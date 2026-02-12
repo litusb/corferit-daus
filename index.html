@@ -375,6 +375,34 @@
                transform: scale(1);
             }
          }
+         #fearContainer {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            min-height: 32px;
+         }
+
+         .fear-dot {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background-color: #999; /* fondo gris claro */
+            border: 2px solid #ccc;
+            cursor: pointer;
+            transition: background 0.3s;
+         }
+
+         .fear-dot.filled {
+            background-color: #800080; /* morado */
+         }
+
+         #fearControls {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+            justify-content: center;
+         }
       </style>
    </head>
 
@@ -398,9 +426,28 @@
 
          <div id="app" style="display: none">
             <div id="roomLabel"></div>
+            <div
+               id="fearContainerWrapper"
+               style="
+                  margin-bottom: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+               "
+            >
+               <div id="fearControls" style="margin-bottom: 6px; display: none">
+                  <button id="fearMinus">-</button>
+                  <button id="fearPlus">+</button>
+               </div>
+               <div
+                  id="fearContainer"
+                  style="display: flex; gap: 6px; flex-wrap: wrap"
+               ></div>
+            </div>
+
             <input
                id="playerName"
-               placeholder="El teu nom"
+               placeholder="Un nom"
                style="padding: 8px; margin-bottom: 10px"
             /><br />
 
@@ -465,6 +512,11 @@
             query,
             orderBy,
             limit,
+            doc,
+            getDoc,
+            getDocs,
+            deleteDoc,
+            setDoc,
          } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
          import {
             getAuth,
@@ -487,29 +539,24 @@
          const db = getFirestore(app);
          const auth = getAuth(app);
 
-         import {
-            getDocs,
-            deleteDoc,
-         } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-
          async function cleanOldRooms() {
-            const roomsSnapshot = await getDocs(collection(db, "rooms"));
+            const roomsSnapshot = await getDocs(collection(db, "rooms")); // 🔹 getDocs para colecciones
             const now = Date.now();
             const DAY = 24 * 60 * 60 * 1000;
 
-            roomsSnapshot.forEach(async (room) => {
-               const data = room.data();
+            roomsSnapshot.forEach(async (roomDoc) => {
+               const data = roomDoc.data();
                if (data.createdAt && now - data.createdAt.toMillis() > DAY) {
                   // borrar tiradas
                   const rollsSnapshot = await getDocs(
-                     collection(db, `rooms/${room.id}/rolls`),
-                  );
-                  rollsSnapshot.forEach(async (roll) => {
-                     await deleteDoc(roll.ref);
+                     collection(db, `rooms/${roomDoc.id}/rolls`),
+                  ); // 🔹 getDocs también
+                  rollsSnapshot.forEach(async (rollDoc) => {
+                     await deleteDoc(rollDoc.ref);
                   });
 
                   // borrar sala
-                  await deleteDoc(room.ref);
+                  await deleteDoc(roomDoc.ref);
                }
             });
          }
@@ -525,7 +572,8 @@
          const roomName = getRoomFromURL();
          document.getElementById("roomLabel").innerText = "Sala: " + roomName;
 
-         const rollsRef = collection(db, `rooms/${roomName}/rolls`);
+         const rollsRef = collection(db, "rooms", roomName, "rolls");
+
          const q = query(rollsRef, orderBy("time", "desc"), limit(50));
 
          // 🔐 LOGIN
@@ -544,13 +592,24 @@
          window.logout = async function () {
             await signOut(auth);
          };
+         async function checkMaster(user) {
+            const userRef = doc(db, "users", user.uid);
+            const userSnap = await getDoc(userRef);
+
+            if (userSnap.exists()) {
+               const data = userSnap.data();
+               return data.isMaster === true; // true si es máster
+            }
+            return false; // no existe → no es máster
+         }
 
          // 🔐 Estado de autenticación
-         onAuthStateChanged(auth, (user) => {
+         onAuthStateChanged(auth, async (user) => {
             if (user) {
                document.getElementById("loginBox").style.display = "none";
                document.getElementById("app").style.display = "block";
-               startApp();
+               const isMaster = await checkMaster(user); // leemos si es máster
+               startApp(isMaster);
             } else {
                document.getElementById("loginBox").style.display = "block";
                document.getElementById("app").style.display = "none";
@@ -558,7 +617,7 @@
          });
 
          // 🔹 Firestore en tiempo real
-         function startApp() {
+         function startApp(isMaster) {
             onSnapshot(q, (snapshot) => {
                const historyDiv = document.getElementById("history");
                historyDiv.innerHTML = "";
@@ -568,6 +627,94 @@
                });
             });
             createDiceMenu();
+
+            // ==== CONTADOR DE POR ====
+            let currentFear = 0;
+            let maxFear = 12;
+            // let isMaster = true; // true para mostrar controles
+
+            const fearContainer = document.getElementById("fearContainer");
+            const fearControls = document.getElementById("fearControls");
+            const fearPlus = document.getElementById("fearPlus");
+            const fearMinus = document.getElementById("fearMinus");
+
+            // Renderiza los dots según currentFear y maxFear
+            function renderFearDots() {
+               fearContainer.innerHTML = "";
+               for (let i = 0; i < maxFear; i++) {
+                  const dot = document.createElement("div");
+                  dot.className = "fear-dot";
+                  if (i < currentFear) dot.classList.add("filled");
+
+                  if (isMaster) {
+                     // clic izquierdo = aumentar hasta ese punto
+                     dot.addEventListener("click", () => {
+                        currentFear = i + 1;
+                        updateFearDisplay();
+                        saveFear();
+                     });
+                     // clic derecho = disminuir hasta ese punto
+                     dot.addEventListener("contextmenu", (e) => {
+                        e.preventDefault();
+                        currentFear = i;
+                        updateFearDisplay();
+                        saveFear();
+                     });
+                  }
+
+                  fearContainer.appendChild(dot);
+               }
+            }
+
+            // Actualiza el display sin tocar Firestore
+            function updateFearDisplay() {
+               const dots = document.querySelectorAll(".fear-dot");
+               dots.forEach((dot, index) => {
+                  dot.classList.toggle("filled", index < currentFear);
+               });
+            }
+
+            // Guardar en Firestore
+            async function saveFear() {
+               try {
+                  const fearRef = doc(db, "rooms", roomName, "fear", "counter");
+
+                  await setDoc(fearRef, { value: currentFear, max: maxFear });
+               } catch (err) {
+                  console.error("Error guardando Fear en Firestore:", err);
+               }
+            }
+
+            // Sincronización en tiempo real con Firestore
+            const fearRef = doc(db, "rooms", roomName, "fear", "counter");
+
+            onSnapshot(fearRef, (docSnap) => {
+               if (docSnap.exists()) {
+                  const data = docSnap.data();
+                  currentFear = data.value ?? 0;
+                  maxFear = data.max ?? 12;
+               }
+               renderFearDots();
+            });
+
+            // Botones de añadir/quitar casillas
+            fearPlus.addEventListener("click", () => {
+               maxFear++;
+               renderFearDots();
+               saveFear();
+            });
+            fearMinus.addEventListener("click", () => {
+               if (maxFear > 12) maxFear--;
+               if (currentFear > maxFear) currentFear = maxFear;
+               renderFearDots();
+               saveFear();
+            });
+
+            // Mostrar controles solo si es master
+            fearControls.style.display = isMaster ? "flex" : "none";
+
+            // Render inicial para que se vean los dots aunque Firestore esté vacío
+            renderFearDots();
          }
 
          // 🎲 Dados
