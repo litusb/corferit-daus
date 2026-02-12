@@ -1,162 +1,91 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Corferit</title>
+<html lang="ca">
+   <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="./recursos/css/estil.css">
+      <title>Generador de personatges per a Cairn</title>
+   </head>
+   <body>
+      <script
+         type="text/javascript"
+         src="./recursos/js/jquery-3.5.1.min.js"
+      ></script>
+      <script
+         type="text/javascript"
+         src="./recursos/js/generador_pdf.js"
+      ></script>
+      <script
+         type="text/javascript"
+         src="./recursos/js/generator.js"
+      ></script>
+      <script
+         type="text/javascript"
+         src="./recursos/js/dades_cairn.js"
+      ></script>
+      <script
+         type="text/javascript"
+         src="./recursos/js/pdf-lib.js"
+      ></script>
+      <div id="main-content" class="main-content">
+      <main>
+      <div class="page">
+         <div class="chargen">
+            <h1><span id=nom></span> <span id=cognom></span>, <i><span id="edat"></span> anys.</i></h1>
+            <span id=rerefons_addicional></span> i <span id=rerefons></span>
+                  <br /><button onclick="descarregarPDF()">Descarregar en PDF</button>
+                        <h3>Aparença</h3>
+                        <span id="personatge"></span>
+            <div class="meitat">
+                  <div class="atributs">
+                        <h3>Atributs</h3>
+                        <b>PD: </b>&nbsp;<span id="pd"></span><br />
+                        <b>Armadura: </b>&nbsp;<span id="armaduraTotal"></span><br />
+                        <b>FOR: </b>&nbsp;<span id="for"></span><br />
+                        <b>DES: </b>&nbsp;<span id="des"></span><br />
+                        <b>VOL: </b>&nbsp;<span id="vol"></span><br />
+                  </div>
+                  <div class="equipament">
+                        <h3>Equip inicial</h3>
+                        <b>Armadura: </b>&nbsp;<span id="armadura"></span><span id="casc"></span
+                        >.<br />
+                        <b>Arma: </b>&nbsp;<span id="armes"></span>.<br />
+                        <b>Material expedicionari, eines i fòtils: </b>&nbsp;<span id="eina"></span>,
+                        <span id="material"></span> i <span id="fotil"></span>.<br />
+                        <b>Objectes addicionals: </b>&nbsp;<span id="addicional"></span>.<br />
+                        <b>Equip inicial: </b>&nbsp;<span id="or"></span> monedes d'or, una
+                        torxa i racions per tres dies.<br />
+                        <b>Inventari: </b>&nbsp; fas servir <span id="total"></span> dels 10
+                        espais disponibles.<br />
+                  </div>
+            </div>
 
-<style>
-body { font-family: sans-serif; background: #222; color: #eee; text-align: center; padding: 20px; }
-.btn { margin: 10px; padding: 12px 22px; background: #444; color: #fff; border: none; border-radius: 10px; font-size: 20px; cursor: pointer; }
-#result { margin-top: 20px; font-size: 26px; }
-#history { margin-top: 20px; text-align: left; width: 320px; margin-left: auto; margin-right: auto; max-height: 300px; overflow-y: auto; }
-.esperança { color: #FFD700; font-weight: bold; }
-.por { color: #800080; font-weight: bold; }
-#roomLabel { opacity: 0.7; margin-bottom: 10px; }
-#loginBox input { padding:8px; margin:5px; width:200px; }
-#loginBox { margin-bottom: 20px; }
-</style>
-</head>
+            <h3>Notes</h3>
+            <li>
+               Els articles «apilables» poden compartir el mateix espai d'inventari.
+            </li>
+            <li>Si tens l'inventari ple, els teus PD es redueixen a 0.</li>
+            <li>El generador no té en compte si duus un carretó, així que ajusta l'inventari manualment segons convingui.</li>
+            <li>El mateix aplica per la descàrrega del PDF: poden fer falta petits ajustos d'inventari. Tingueu en compte que els articles voluminosos compten doble.</li>
+            <li>
+               Aquest generador fa servir la <a href="https://litusb.itch.io/taula-de-noms-i-rerefons-addicionals-per-a-cairn">Taula de noms i rerefons addicionals per a Cairn</a> de la <a href="https://itch.io/jam/melmelada-rolera-2025/entries">2a Tirant lo Jam. Melmelada rolera: Cairn</a>. Si vols fer servir els noms clàssics, et dius <span id=nomclassic></span> <span id=cognomclassic></span> i només has d'agafar el segon rerefons.
+            </li>
+         </div>
 
-<body>
 
-<h1>🎲 Corferit</h1>
+         <a href="javascript:window.scrollTo(0,0); window.location.reload(true)"
+            >Recarrega la pàgina</a> per generar un nou personatge.
+         <br />Basat en el <i><a href="https://cairnrpg.com/first-edition/tools/character-generator/"> Character Generator</a></i> de la pàgina oficial de Cairn.
+         <br />Funciona amb la tecnologia de
+         <a href="https://donjon.bin.sh/code/random">donjon generators</a>.
+      <h3>Juga a <a href="https://tirant-lo-dau.itch.io/cairn">Cairn en català.</a></h3>
 
-<div id="loginBox">
-  <input type="email" id="email" placeholder="Email"><br>
-  <input type="password" id="password" placeholder="Contraseña"><br>
-  <button class="btn" onclick="login()">Entrar</button>
-</div>
-
-<div id="app" style="display:none;">
-
-<div id="roomLabel"></div>
-<input id="playerName" placeholder="Tu nombre" style="padding:8px;margin-bottom:10px"><br>
-
-<button class="btn" onclick="rollDuality(0)">D-</button>
-<button class="btn" onclick="rollDuality()">⬡⬢</button>
-<button class="btn" onclick="rollDuality(1)">A+</button>
-
-<div id="result"></div>
-
-<h3>Historial compartido</h3>
-<div id="history"></div>
-
-<br>
-<button class="btn" onclick="logout()">Cerrar sesión</button>
-
-</div>
-
-<script type="module">
-
-// 🔹 Firebase imports
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy }
-from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
-from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-
-// 🔹 Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyCLRBsJDKcv9I0hf3uosB0F3w7rXWU-40A",
-  authDomain: "corferit-daus.firebaseapp.com",
-  projectId: "corferit-daus",
-  storageBucket: "corferit-daus.firebasestorage.app",
-  messagingSenderId: "756634249064",
-  appId: "1:756634249064:web:8e09d8bf75aebcb1b118dd"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// 🔹 Sala desde URL
-function getRoomFromURL() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("room") || "sala-general";
-}
-
-const roomName = getRoomFromURL();
-document.getElementById("roomLabel").innerText = "Sala: " + roomName;
-
-const rollsRef = collection(db, `rooms/${roomName}/rolls`);
-const q = query(rollsRef, orderBy("time", "desc"));
-
-// 🔐 LOGIN
-window.login = async function() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (error) {
-    alert("Error de login: " + error.message);
-  }
-}
-
-// 🔐 LOGOUT
-window.logout = async function() {
-  await signOut(auth);
-}
-
-// 🔐 Estado de autenticación
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    startApp();
-  } else {
-    document.getElementById("loginBox").style.display = "block";
-    document.getElementById("app").style.display = "none";
-  }
-});
-
-// 🔹 Firestore en tiempo real
-function startApp() {
-  onSnapshot(q, (snapshot) => {
-    const historyDiv = document.getElementById("history");
-    historyDiv.innerHTML = "";
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      historyDiv.innerHTML += `<div>${data.text}</div><hr>`;
-    });
-  });
-}
-
-// 🎲 Dados
-window.rollD12 = function() { return Math.floor(Math.random() * 12) + 1; }
-window.rollD6 = function() { return Math.floor(Math.random() * 6) + 1; }
-
-window.rollDuality = async function(v) {
-  const esperança = rollD12();
-  const por = rollD12();
-  const d6 = rollD6();
-
-  let winner = "";
-  let final = esperança + por;
-  let colorClass = "";
-
-  if (esperança >= por) {
-    winner = "Esperança";
-    colorClass = "esperança";
-  } else {
-    winner = "Por";
-    colorClass = "por";
-  }
-
-  let modifierText = "";
-  if (v == 1) { final += d6; modifierText = ` | +⚅ ${d6}`; }
-  else if (v == 0) { final -= d6; modifierText = ` | -⚅ ${d6}`; }
-
-  const player = document.getElementById("playerName").value || auth.currentUser.email;
-
-  const text = `<strong>${player}</strong><br>⬡ ${esperança} | ⬢ ${por}${modifierText}<br><strong>${final}</strong> amb <span class="${colorClass}">${winner}</span>.`;
-
-  document.getElementById("result").innerHTML = text;
-
-  await addDoc(rollsRef, { text: text, time: Date.now() });
-}
-
-</script>
-</body>
+      </div>
+      </main>
+            <script
+               type="text/javascript"
+               src="./recursos/js/principal.js"
+            ></script>
+      </div>
+   </body>
 </html>
