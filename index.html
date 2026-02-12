@@ -487,6 +487,7 @@
         deleteDoc,
         setDoc,
         serverTimestamp,
+        writeBatch,
       } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
       import {
         getAuth,
@@ -509,37 +510,111 @@
       const db = getFirestore(app);
       const auth = getAuth(app);
 
+      // Variables Globals.
       let currentRoomName = null;
       let currentRollsRef = null;
 
-      async function cleanOldRooms() {
-        const roomsSnapshot = await getDocs(collection(db, "rooms")); // getDocs para colecciones
+      // async function cleanOldRooms() {
+      //   const roomsSnapshot = await getDocs(collection(db, "rooms"));
+      //   const now = Date.now();
+      //   const DAY = 24 * 60 * 60 * 1000;
+      //
+      //   roomsSnapshot.forEach(async (roomDoc) => {
+      //     const data = roomDoc.data();
+      //     if (data.createdAt && now - data.createdAt.toMillis() > DAY) {
+      //       // borrar tirades.
+      //       const rollsSnapshot = await getDocs(collection(db, `rooms/${roomDoc.id}/rolls`));
+      //       rollsSnapshot.forEach(async (rollDoc) => {
+      //         await deleteDoc(rollDoc.ref);
+      //       });
+      //
+      //       // borrar sala.
+      //       await deleteDoc(roomDoc.ref);
+      //     }
+      //   });
+      // }
+
+      async function cleanOldRooms(currentRoomName) {
+        const roomsSnapshot = await getDocs(collection(db, "rooms"));
         const now = Date.now();
         const DAY = 24 * 60 * 60 * 1000;
 
-        roomsSnapshot.forEach(async (roomDoc) => {
-          const data = roomDoc.data();
-          if (data.createdAt && now - data.createdAt.toMillis() > DAY) {
-            // borrar tiradas
-            const rollsSnapshot = await getDocs(
-              collection(db, `rooms/${roomDoc.id}/rolls`),
-            ); // 🔹 getDocs también
-            rollsSnapshot.forEach(async (rollDoc) => {
-              await deleteDoc(rollDoc.ref);
-            });
+        let batch = writeBatch(db);
+        let operationsCount = 0;
 
-            // borrar sala
-            await deleteDoc(roomDoc.ref);
+        async function commitBatchIfFull() {
+          if (operationsCount >= 450) { // 450 para estar seguros
+            await batch.commit();
+            console.log("Batch intermedio ejecutado");
+            batch = writeBatch(db);
+            operationsCount = 0;
           }
-        });
+        }
+
+        // ----------------------------
+        // Limpiar rooms viejas
+        // ----------------------------
+        for (const roomDoc of roomsSnapshot.docs) {
+          const roomId = roomDoc.id;
+          const data = roomDoc.data();
+
+          if (roomId === "sala-principal") continue;
+
+          if (data.createdAt && data.createdAt.toMillis) {
+            const roomAge = now - data.createdAt.toMillis();
+
+            if (roomAge > DAY) {
+              // Borrar rolls
+              const rollsSnapshot = await getDocs(collection(db, "rooms", roomId, "rolls"));
+              for (const rollDoc of rollsSnapshot.docs) {
+                batch.delete(rollDoc.ref);
+                operationsCount++;
+                await commitBatchIfFull();
+              }
+
+              // Borrar room
+              batch.delete(roomDoc.ref);
+              operationsCount++;
+              await commitBatchIfFull();
+            }
+          }
+        }
+
+        // ----------------------------
+        // Limpiar rolls antiguos de la sala actual
+        // ----------------------------
+        if (currentRoomName) {
+          const rollsSnapshot = await getDocs(collection(db, "rooms", currentRoomName, "rolls"));
+          for (const rollDoc of rollsSnapshot.docs) {
+            const rollData = rollDoc.data();
+            if (rollData.time && rollData.time.toMillis) {
+              const rollAge = now - rollData.time.toMillis();
+              if (rollAge > DAY) {
+                batch.delete(rollDoc.ref);
+                operationsCount++;
+                await commitBatchIfFull();
+              }
+            }
+          }
+        }
+
+        // ----------------------------
+        // Ejecutar batch final
+        // ----------------------------
+        if (operationsCount > 0) {
+          try {
+            await batch.commit();
+            console.log("Batch final ejecutado, limpieza completada");
+          } catch (e) {
+            console.error("Error al ejecutar el batch final:", e);
+          }
+        }
       }
 
-      cleanOldRooms();
-
-      // Sala desde URL
+      // Sala desde URL amb el paràmetre *room* o *sala*.
       function getRoomFromURL() {
         const params = new URLSearchParams(window.location.search);
-        return params.get("room") || return params.get("sala") || "sala-general";
+        return params.get("room") || params.get("sala") || "sala-general";
       }
 
       // LOGIN
@@ -558,25 +633,29 @@
       window.logout = async function () {
         await signOut(auth);
       };
+
+      // Comprovar si l'usuari és màster.
       async function checkMaster(user) {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
           const data = userSnap.data();
-          return data.isMaster === true; // true si es máster
+          return data.isMaster === true;
         }
-        return false; // no existe → no es máster
+        return false;
       }
 
-      // Estado de autenticación
+      // Ens autentifiquem i pasen coses.
       onAuthStateChanged(auth, async (user) => {
+        // Si no estàs autentificat mostra el login i surt del bucle.
         if (!user) {
           document.getElementById("loginBox").style.display = "block";
           document.getElementById("app").style.display = "none";
           return;
         }
 
+        // Per defecte (si estàs autentificat) amaga la caixa de login i ensenya la app.
         document.getElementById("loginBox").style.display = "none";
         document.getElementById("app").style.display = "block";
 
@@ -585,9 +664,9 @@
           document.getElementById("roomLabel").innerText = "Sala: " + roomName;
         }
 
+        // Intenta crear la sala a Firebase.
         const roomRef = doc(db, "rooms", roomName);
         const roomSnap = await getDoc(roomRef);
-
         if (!roomSnap.exists()) {
           try {
             await setDoc(roomRef, {
@@ -595,17 +674,20 @@
               createdAt: serverTimestamp(),
             });
           } catch (e) {
-            console.warn("No tienes permisos para crear esta sala");
+            console.warn("No tens permisos per crear aquesta sala.");
             return;
           }
         }
 
-        // creamos las referencias
+        // Creem l'historial de tirades.
         const rollsRef = collection(db, "rooms", roomName, "rolls");
         const q = query(rollsRef, orderBy("time", "desc"), limit(50));
 
+        // Ara sí, inicialitzem les variables globals dins el bucle d'autentificació.
         currentRoomName = roomName;
         currentRollsRef = collection(db, "rooms", roomName, "rolls");
+
+        cleanOldRooms(currentRoomName);
 
         const isMaster = await checkMaster(user);
 
@@ -617,22 +699,32 @@
         });
       });
 
-      // Firestore en tiempo real
+      // Firestore a temps real.
       function startApp({ isMaster, roomName, rollsRef, q }) {
         onSnapshot(q, (snapshot) => {
           const historyDiv = document.getElementById("history");
           historyDiv.innerHTML = "";
           snapshot.forEach((doc) => {
             const data = doc.data();
-            historyDiv.innerHTML += `<div>${data.text}</div><hr>`;
+            let formattedTime = "";
+
+            if (data.time && typeof data.time.toDate === "function") {
+              formattedTime = data.time.toDate().toLocaleTimeString("es-ES", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+              });
+            }
+            historyDiv.innerHTML += `<div>[${formattedTime}] ${data.text}</div><hr>`;
           });
         });
+
+        // Creem el menu de daus.
         createDiceMenu();
 
         // ==== CONTADOR DE POR ====
         let currentFear = 0;
         let maxFear = 12;
-        // let isMaster = true; // true para mostrar controles
 
         const fearContainer = document.getElementById("fearContainer");
         const fearControls = document.getElementById("fearControls");
@@ -717,6 +809,7 @@
         // Render inicial para que se vean los dots aunque Firestore esté vacío
         renderFearDots();
       }
+      //acaba startApp()
 
       // 🎲 Dados
       window.rollD12 = function () {
@@ -775,12 +868,6 @@
         const player =
           document.getElementById("playerName").value || auth.currentUser.email;
 
-        const timestamp = new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
-
         let criticalHTML = "";
         if (isCritical) {
           criticalHTML = `<span class="critical">🎯 CRÍTIC! 🎯</span>`;
@@ -814,8 +901,8 @@
         }
 
         await addDoc(currentRollsRef, {
-          text: timestamp + text,
-          time: Date.now(),
+          text: text,
+          time: serverTimestamp(),
         });
       };
       const diceTypes = [3, 4, 6, 8, 10, 12, 20, 100];
@@ -865,7 +952,7 @@
         input.value = value;
       };
 
-      // Dados animados
+      // Daus clàssics
       window.rollCustomDice = async function () {
         let resultsHTML = "";
         let total = 0;
@@ -894,12 +981,6 @@
         const player =
           document.getElementById("playerName").value || auth.currentUser.email;
 
-        const timestamp = new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
-
         if (fixedModifier != 0) {
           fixedModifierHTML = `<span class="dice-icon modificador-fixe roll-animate">${fixedModifier >= 0 ? "+" : ""}${fixedModifier}</span>`;
         }
@@ -918,20 +999,14 @@
           return;
         }
         await addDoc(currentRollsRef, {
-          text: timestamp + text,
-          time: Date.now(),
+          text: text,
+          time: serverTimestamp(),
         });
       };
       window.rollSingleDie = async function (sides) {
         const roll = Math.floor(Math.random() * sides) + 1;
         const player =
           document.getElementById("playerName").value || auth.currentUser.email;
-
-        const timestamp = new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
 
         const resultHTML = `
               <strong>${player}</strong><br><br>
@@ -946,8 +1021,8 @@
           return;
         }
         await addDoc(currentRollsRef, {
-          text: timestamp + resultHTML,
-          time: Date.now(),
+          text: resultHTML,
+          time: serverTimestamp(),
         });
       };
       const toggleDice = document.getElementById("toggleDice");
