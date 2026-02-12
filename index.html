@@ -1,91 +1,789 @@
 <!DOCTYPE html>
 <html lang="ca">
    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <link rel="stylesheet" href="./recursos/css/estil.css">
-      <title>Generador de personatges per a Cairn</title>
-   </head>
-   <body>
-      <script
-         type="text/javascript"
-         src="./recursos/js/jquery-3.5.1.min.js"
-      ></script>
-      <script
-         type="text/javascript"
-         src="./recursos/js/generador_pdf.js"
-      ></script>
-      <script
-         type="text/javascript"
-         src="./recursos/js/generator.js"
-      ></script>
-      <script
-         type="text/javascript"
-         src="./recursos/js/dades_cairn.js"
-      ></script>
-      <script
-         type="text/javascript"
-         src="./recursos/js/pdf-lib.js"
-      ></script>
-      <div id="main-content" class="main-content">
-      <main>
-      <div class="page">
-         <div class="chargen">
-            <h1><span id=nom></span> <span id=cognom></span>, <i><span id="edat"></span> anys.</i></h1>
-            <span id=rerefons_addicional></span> i <span id=rerefons></span>
-                  <br /><button onclick="descarregarPDF()">Descarregar en PDF</button>
-                        <h3>Aparença</h3>
-                        <span id="personatge"></span>
-            <div class="meitat">
-                  <div class="atributs">
-                        <h3>Atributs</h3>
-                        <b>PD: </b>&nbsp;<span id="pd"></span><br />
-                        <b>Armadura: </b>&nbsp;<span id="armaduraTotal"></span><br />
-                        <b>FOR: </b>&nbsp;<span id="for"></span><br />
-                        <b>DES: </b>&nbsp;<span id="des"></span><br />
-                        <b>VOL: </b>&nbsp;<span id="vol"></span><br />
-                  </div>
-                  <div class="equipament">
-                        <h3>Equip inicial</h3>
-                        <b>Armadura: </b>&nbsp;<span id="armadura"></span><span id="casc"></span
-                        >.<br />
-                        <b>Arma: </b>&nbsp;<span id="armes"></span>.<br />
-                        <b>Material expedicionari, eines i fòtils: </b>&nbsp;<span id="eina"></span>,
-                        <span id="material"></span> i <span id="fotil"></span>.<br />
-                        <b>Objectes addicionals: </b>&nbsp;<span id="addicional"></span>.<br />
-                        <b>Equip inicial: </b>&nbsp;<span id="or"></span> monedes d'or, una
-                        torxa i racions per tres dies.<br />
-                        <b>Inventari: </b>&nbsp; fas servir <span id="total"></span> dels 10
-                        espais disponibles.<br />
-                  </div>
-            </div>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-            <h3>Notes</h3>
-            <li>
-               Els articles «apilables» poden compartir el mateix espai d'inventari.
-            </li>
-            <li>Si tens l'inventari ple, els teus PD es redueixen a 0.</li>
-            <li>El generador no té en compte si duus un carretó, així que ajusta l'inventari manualment segons convingui.</li>
-            <li>El mateix aplica per la descàrrega del PDF: poden fer falta petits ajustos d'inventari. Tingueu en compte que els articles voluminosos compten doble.</li>
-            <li>
-               Aquest generador fa servir la <a href="https://litusb.itch.io/taula-de-noms-i-rerefons-addicionals-per-a-cairn">Taula de noms i rerefons addicionals per a Cairn</a> de la <a href="https://itch.io/jam/melmelada-rolera-2025/entries">2a Tirant lo Jam. Melmelada rolera: Cairn</a>. Si vols fer servir els noms clàssics, et dius <span id=nomclassic></span> <span id=cognomclassic></span> i només has d'agafar el segon rerefons.
-            </li>
+      <title>Corferit</title>
+
+      <style>
+         body {
+            font-family: sans-serif;
+            background: #444;
+            color: #eee;
+            text-align: center;
+            padding: 20px;
+         }
+         .page {
+            max-width: 350px;
+            margin: 40px auto;
+            padding: 32px 40px;
+            background: #222;
+            border-radius: 10px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
+         }
+         .btn {
+            margin: 10px;
+            padding: 12px 22px;
+            background: #444;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 20px;
+            cursor: pointer;
+         }
+         #result {
+            margin-top: 20px;
+            font-size: 26px;
+         }
+         #history {
+            margin-top: 20px;
+            text-align: left;
+            width: 320px;
+            margin-left: auto;
+            margin-right: auto;
+            max-height: 300px;
+            overflow-y: auto;
+         }
+         .esperança {
+            color: #ffd700;
+            font-weight: bold;
+         }
+         .por {
+            color: #800080;
+            font-weight: bold;
+         }
+         #roomLabel {
+            opacity: 0.7;
+            margin-bottom: 10px;
+         }
+         #loginBox input {
+            padding: 8px;
+            margin: 5px;
+            width: 200px;
+         }
+         #loginBox {
+            margin-bottom: 20px;
+         }
+         .dice-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            background: #333;
+            padding: 8px 10px;
+            border-radius: 8px;
+         }
+
+         .dice-label {
+            font-weight: bold;
+         }
+
+         .counter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+         }
+
+         .counter button {
+            background: #555;
+            border: none;
+            color: white;
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+         }
+
+         .counter input {
+            width: 40px;
+            text-align: center;
+            background: #222;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 6px;
+            padding: 4px;
+         }
+         /* ===== ICONOS DE DADOS ===== */
+
+         .dice-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 6px;
+            color: white;
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.6);
+            transition: transform 0.2s ease;
+         }
+
+         /* Colores por tipo */
+         /* D3 → círculo */
+         .d3 {
+            background-color: #0661bb;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="rgba(0,0,0,0.2)" stroke="black" stroke-width="2"/></svg>');
+            background-size: 70% 70%;
+            background-repeat: no-repeat;
+            background-position: center;
+         }
+
+         /* D4 → triángulo */
+         .d4 {
+            background-color: #39b44a;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><polygon points="32,4 60,60 4,60" fill="rgba(0,0,0,0.2)" stroke="black" stroke-width="2"/></svg>');
+            background-size: 70% 70%;
+            background-repeat: no-repeat;
+            background-position: center;
+         }
+
+         /* D6 → cuadrado */
+         .d6 {
+            background-color: #27bbd0;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="4" y="4" width="56" height="56" fill="rgba(0,0,0,0.2)" stroke="black" stroke-width="2"/></svg>');
+            background-size: 70% 70%;
+            background-repeat: no-repeat;
+            background-position: center;
+         }
+
+         /* D8 → octaedro (forma romboidal simple) */
+         .d8 {
+            background-color: #9234e5;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><polygon points="32,4 60,32 32,60 4,32" fill="rgba(0,0,0,0.2)" stroke="black" stroke-width="2"/></svg>');
+            background-size: 70% 70%;
+            background-repeat: no-repeat;
+            background-position: center;
+         }
+
+         /* D10 →  */
+         .d10 {
+            background-color: #e03293;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><polygon points="32,4 56,20 56,44 32,60 8,44 8,20" fill="rgba(0,0,0,0.2)" stroke="black" stroke-width="2"/><line x1="32" y1="4" x2="32" y2="60" stroke="black" stroke-width="1"/><line x1="8" y1="20" x2="56" y2="44" stroke="black" stroke-width="1"/><line x1="56" y1="20" x2="8" y2="44" stroke="black" stroke-width="1"/></svg>');
+
+            background-size: 70% 70%;
+            background-repeat: no-repeat;
+            background-position: center;
+         }
+
+         /* D12 → pentágono */
+         .d12 {
+            background-color: #d83025;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><polygon points="32,4 60,24 49,60 15,60 4,24" fill="rgba(0,0,0,0.2)" stroke="black" stroke-width="2"/></svg>');
+            background-size: 70% 70%;
+            background-repeat: no-repeat;
+            background-position: center;
+         }
+
+         /* D20 → icosaedro simplificado (estrella) */
+         .d20 {
+            background-color: #f05a24;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="rgba(0,0,0,0.1)" stroke="black" stroke-width="2"/><polygon points="32,4 44,20 60,24 48,36 52,56 32,44 12,56 16,36 4,24 20,20" fill="none" stroke="black" stroke-width="1"/></svg>');
+
+            background-size: 70% 70%;
+            background-repeat: no-repeat;
+            background-position: center;
+         }
+
+         /* D100 → círculo con borde doble */
+         .d100 {
+            background-color: #22b473;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="rgba(0,0,0,0.15)" stroke="black" stroke-width="2"/><circle cx="32" cy="32" r="16" fill="none" stroke="black" stroke-width="2"/></svg>');
+            background-size: 70% 70%;
+            background-repeat: no-repeat;
+            background-position: center;
+         }
+
+         /* Animación de tirada */
+         @keyframes rollBounce {
+            0% {
+               transform: scale(1) rotate(0deg);
+            }
+            30% {
+               transform: scale(1.2) rotate(10deg);
+            }
+            60% {
+               transform: scale(0.9) rotate(-8deg);
+            }
+            100% {
+               transform: scale(1) rotate(0deg);
+            }
+         }
+
+         .roll-animate {
+            animation: rollBounce 0.4s ease;
+         }
+         /* ===== BOTONES TIPO DADO ===== */
+
+         .dice-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            border: none;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 8px;
+            color: white;
+            background: #444;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.6);
+            transition:
+               transform 0.15s ease,
+               background 0.2s ease;
+         }
+
+         .dice-button:hover {
+            transform: scale(1.08);
+            background: #555;
+         }
+
+         /* Colores especiales */
+         .btn-advantage {
+            background: #16a085;
+         }
+
+         .btn-disadvantage {
+            background: #e74c3c;
+         }
+
+         .btn-duality {
+            background: linear-gradient(
+               135deg,
+               #f1c40f,
+               #d4ac0d 45%,
+               #8e44ad 55%,
+               #6c3483
+            );
+            box-shadow:
+               inset 0 0 12px rgba(0, 0, 0, 0.6),
+               0 0 10px rgba(241, 196, 15, 0.3),
+               0 0 10px rgba(142, 68, 173, 0.3);
+            position: relative;
+            overflow: hidden;
+         }
+         .btn-duality:hover {
+            filter: brightness(1.1);
+            transform: scale(1.08);
+         }
+
+         .esperanca-die {
+            background: #f1c40f;
+            color: black;
+         }
+
+         .por-die {
+            background: #8e44ad;
+         }
+         /* d6 ventaja y desventaja */
+
+         .adv-die {
+            background: #2ecc71;
+            color: #000;
+         }
+
+         .dis-die {
+            background: #e74c3c;
+            color: #fff;
+         }
+         .adv-die::before {
+            content: "+";
+            font-weight: bold;
+            margin-right: 2px;
+         }
+
+         .dis-die::before {
+            content: "−";
+            font-weight: bold;
+            margin-right: 2px;
+         }
+         .dice-icon {
+            cursor: pointer;
+         }
+
+         .dice-icon:hover {
+            transform: scale(1.1);
+         }
+
+         .modificador-fixe {
+            background: #b3b3b3;
+            color: #fff;
+         }
+
+         #toggleDice {
+            color: #f1c40f;
+            user-select: none;
+            margin-bottom: 6px;
+            transition: color 0.2s;
+         }
+
+         #toggleDice:hover {
+            color: #f39c12;
+         }
+         /* contenedor tipo pastilla */
+         #diceMenu {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* dos columnas */
+            gap: 10px;
+            padding: 12px;
+            border-radius: 12px;
+            background: #333; /* color de la pastilla */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+         }
+
+         @media (max-width: 500px) {
+            #diceMenu {
+               grid-auto-flow: row; /* vuelve a fila única */
+               grid-template-columns: 1fr;
+            }
+         }
+
+         /* cada fila de dado sin fondo propio */
+         .dice-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0; /* quitamos margen extra */
+            padding: 0; /* quitamos padding extra */
+            background: none; /* quitamos color de fondo */
+         }
+         /* CRÍTICO */
+         .critical {
+            color: #f39c12; /* dorado brillante */
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
+            display: block;
+            margin-top: 8px;
+            animation: pulse 0.5s ease 0s 2; /* pulso animado */
+         }
+
+         /* Animación de pulso */
+         @keyframes pulse {
+            0% {
+               transform: scale(1);
+            }
+            50% {
+               transform: scale(1.3);
+            }
+            100% {
+               transform: scale(1);
+            }
+         }
+      </style>
+   </head>
+
+   <body>
+      <div class="page">
+         <h1>🎲 Corferit</h1>
+
+         <div id="loginBox">
+            <input
+               type="email"
+               id="email"
+               placeholder="Correu electrònic"
+            /><br />
+            <input
+               type="password"
+               id="password"
+               placeholder="Paraula de pas"
+            /><br />
+            <button class="btn" onclick="login()">Entrar</button>
          </div>
 
+         <div id="app" style="display: none">
+            <div id="roomLabel"></div>
+            <input
+               id="playerName"
+               placeholder="El teu nom"
+               style="padding: 8px; margin-bottom: 10px"
+            /><br />
 
-         <a href="javascript:window.scrollTo(0,0); window.location.reload(true)"
-            >Recarrega la pàgina</a> per generar un nou personatge.
-         <br />Basat en el <i><a href="https://cairnrpg.com/first-edition/tools/character-generator/"> Character Generator</a></i> de la pàgina oficial de Cairn.
-         <br />Funciona amb la tecnologia de
-         <a href="https://donjon.bin.sh/code/random">donjon generators</a>.
-      <h3>Juga a <a href="https://tirant-lo-dau.itch.io/cairn">Cairn en català.</a></h3>
+            <button
+               class="dice-button btn-disadvantage"
+               onclick="rollDuality(0)"
+            >
+               ⬇️D-
+            </button>
 
+            <button class="dice-button btn-duality" onclick="rollDuality()">
+               ⬡⬢
+            </button>
+
+            <button class="dice-button btn-advantage" onclick="rollDuality(1)">
+               ⬆️A+
+            </button>
+
+            <h3 id="toggleDice" style="cursor: pointer">► Daus clàssics</h3>
+
+            <div id="diceContainer" style="display: none">
+               <div id="diceMenu"></div>
+
+               <div
+                  id="fixedModifier"
+                  style="display: none; margin-bottom: 10px; margin-top: 5px"
+                  class="counter"
+               >
+                  <span>Mod. </span>
+                  <button onclick="changeFixedModifier(-1)">-</button>
+                  <input
+                     type="number"
+                     id="modifierInput"
+                     value="0"
+                     style="width: 50px; text-align: center"
+                  />
+                  <button onclick="changeFixedModifier(1)">+</button>
+               </div>
+
+               <button class="btn" onclick="rollCustomDice()">Tirar daus</button
+               ><br /><button class="btn" onclick="clearDice()">Neteja</button>
+            </div>
+
+            <div id="result"></div>
+
+            <h3>Historial</h3>
+            <div id="history"></div>
+
+            <br />
+            <button class="btn" onclick="logout()">Tanca sessió</button>
+         </div>
       </div>
-      </main>
-            <script
-               type="text/javascript"
-               src="./recursos/js/principal.js"
-            ></script>
-      </div>
+
+      <script type="module">
+         // 🔹 Firebase imports
+         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+         import {
+            getFirestore,
+            collection,
+            addDoc,
+            onSnapshot,
+            query,
+            orderBy,
+            limit,
+         } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+         import {
+            getAuth,
+            signInWithEmailAndPassword,
+            onAuthStateChanged,
+            signOut,
+         } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+
+         // 🔹 Firebase config
+         const firebaseConfig = {
+            apiKey: "AIzaSyCLRBsJDKcv9I0hf3uosB0F3w7rXWU-40A",
+            authDomain: "corferit-daus.firebaseapp.com",
+            projectId: "corferit-daus",
+            storageBucket: "corferit-daus.firebasestorage.app",
+            messagingSenderId: "756634249064",
+            appId: "1:756634249064:web:8e09d8bf75aebcb1b118dd",
+         };
+
+         const app = initializeApp(firebaseConfig);
+         const db = getFirestore(app);
+         const auth = getAuth(app);
+
+         import {
+            getDocs,
+            deleteDoc,
+         } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+         async function cleanOldRooms() {
+            const roomsSnapshot = await getDocs(collection(db, "rooms"));
+            const now = Date.now();
+            const DAY = 24 * 60 * 60 * 1000;
+
+            roomsSnapshot.forEach(async (room) => {
+               const data = room.data();
+               if (data.createdAt && now - data.createdAt.toMillis() > DAY) {
+                  // borrar tiradas
+                  const rollsSnapshot = await getDocs(
+                     collection(db, `rooms/${room.id}/rolls`),
+                  );
+                  rollsSnapshot.forEach(async (roll) => {
+                     await deleteDoc(roll.ref);
+                  });
+
+                  // borrar sala
+                  await deleteDoc(room.ref);
+               }
+            });
+         }
+
+         cleanOldRooms();
+
+         // 🔹 Sala desde URL
+         function getRoomFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get("room") || "sala-general";
+         }
+
+         const roomName = getRoomFromURL();
+         document.getElementById("roomLabel").innerText = "Sala: " + roomName;
+
+         const rollsRef = collection(db, `rooms/${roomName}/rolls`);
+         const q = query(rollsRef, orderBy("time", "desc"), limit(50));
+
+         // 🔐 LOGIN
+         window.login = async function () {
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+
+            try {
+               await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+               alert("Error de login: " + error.message);
+            }
+         };
+
+         // 🔐 LOGOUT
+         window.logout = async function () {
+            await signOut(auth);
+         };
+
+         // 🔐 Estado de autenticación
+         onAuthStateChanged(auth, (user) => {
+            if (user) {
+               document.getElementById("loginBox").style.display = "none";
+               document.getElementById("app").style.display = "block";
+               startApp();
+            } else {
+               document.getElementById("loginBox").style.display = "block";
+               document.getElementById("app").style.display = "none";
+            }
+         });
+
+         // 🔹 Firestore en tiempo real
+         function startApp() {
+            onSnapshot(q, (snapshot) => {
+               const historyDiv = document.getElementById("history");
+               historyDiv.innerHTML = "";
+               snapshot.forEach((doc) => {
+                  const data = doc.data();
+                  historyDiv.innerHTML += `<div>${data.text}</div><hr>`;
+               });
+            });
+            createDiceMenu();
+         }
+
+         // 🎲 Dados
+         window.rollD12 = function () {
+            return Math.floor(Math.random() * 12) + 1;
+         };
+         window.rollD6 = function () {
+            return Math.floor(Math.random() * 6) + 1;
+         };
+
+         let fixedModifier = 0;
+
+         window.changeFixedModifier = function (amount) {
+            fixedModifier += amount;
+            document.getElementById("modifierInput").value = fixedModifier;
+         };
+         document
+            .getElementById("modifierInput")
+            .addEventListener("input", (e) => {
+               fixedModifier = parseInt(e.target.value) || 0;
+            });
+         let fixedModifierHTML = "";
+
+         window.rollDuality = async function (v) {
+            const esperança = rollD12();
+            const por = rollD12();
+            const d6 = rollD6();
+
+            let winner = "";
+            let final = esperança + por;
+            let colorClass = "";
+            let isCritical = false;
+
+            if (esperança === por) {
+               isCritical = true;
+            }
+
+            if (esperança >= por) {
+               winner = "Esperança";
+               colorClass = "esperança";
+            } else {
+               winner = "Por";
+               colorClass = "por";
+            }
+
+            // Av/Des diferenciat
+            let modifierHTML = "";
+
+            if (v === 1) {
+               final += d6;
+               modifierHTML = `<span class="dice-icon adv-die roll-animate">${d6}</span>`;
+            } else if (v === 0) {
+               final -= d6;
+               modifierHTML = `<span class="dice-icon dis-die roll-animate">${d6}</span>`;
+            }
+
+            const player =
+               document.getElementById("playerName").value ||
+               auth.currentUser.email;
+
+            let criticalHTML = "";
+            if (isCritical) {
+               criticalHTML = `<span class="critical">🎯 CRÍTIC! 🎯</span>`;
+            }
+
+            let finalWithModifier = final + fixedModifier;
+
+            if (fixedModifier != 0) {
+               fixedModifierHTML = `<span class="dice-icon modificador-fixe roll-animate">${fixedModifier >= 0 ? "+" : ""}${fixedModifier}</span>`;
+            }
+            // Versió animada amb Av/Des diferenciat
+            const text = `
+              <strong>${player}</strong><br><br>
+
+              <span class="dice-icon esperanca-die roll-animate">${esperança}</span>
+              <span class="dice-icon por-die roll-animate">${por}</span>
+              ${modifierHTML}
+              ${fixedModifierHTML}
+
+              <br><br>
+              <strong>${finalWithModifier}</strong> amb
+              <span class="${colorClass}">${winner}</span>
+              ${criticalHTML}
+            `;
+
+            document.getElementById("result").innerHTML = text;
+
+            await addDoc(rollsRef, { text: text, time: Date.now() });
+         };
+         const diceTypes = [3, 4, 6, 8, 10, 12, 20, 100];
+
+         function createDiceMenu() {
+            const container = document.getElementById("diceMenu");
+            container.innerHTML = "";
+
+            diceTypes.forEach((sides) => {
+               const row = document.createElement("div");
+               row.className = "dice-row";
+
+               // Modo iconos pulsables
+               row.innerHTML = `
+                  <div class="dice-icon d${sides}" onclick="rollSingleDie(${sides})">
+                    d${sides}
+                  </div>
+                  <div class="counter">
+                    <button onclick="changeDice(${sides}, -1)">-</button>
+                    <input type="number" id="dice-${sides}" value="0" min="0">
+                    <button onclick="changeDice(${sides}, 1)">+</button>
+                  </div>
+                `;
+
+               container.appendChild(row);
+            });
+         }
+
+         window.clearDice = async function () {
+            // Resetear selección de dados
+            diceTypes.forEach((sides) => {
+               document.getElementById(`dice-${sides}`).value = 0;
+            });
+
+            // Resetear modificador fijo
+            fixedModifier = 0;
+            const modifierInput = document.getElementById("modifierInput");
+            if (modifierInput) modifierInput.value = 0;
+            fixedModifierHTML = "";
+         };
+
+         window.changeDice = function (sides, delta) {
+            const input = document.getElementById(`dice-${sides}`);
+            let value = parseInt(input.value) || 0;
+            value += delta;
+            if (value < 0) value = 0;
+            input.value = value;
+         };
+
+         // Dados animados
+         window.rollCustomDice = async function () {
+            let resultsHTML = "";
+            let total = 0;
+            let rolledSomething = false;
+
+            diceTypes.forEach((sides) => {
+               const qty =
+                  parseInt(document.getElementById(`dice-${sides}`).value) || 0;
+
+               for (let i = 0; i < qty; i++) {
+                  const roll = Math.floor(Math.random() * sides) + 1;
+                  total += roll;
+                  rolledSomething = true;
+
+                  resultsHTML += `<span class="dice-icon d${sides} roll-animate">${roll}</span>`;
+               }
+            });
+
+            if (!rolledSomething) {
+               alert("No has seleccionado ningún dado.");
+               return;
+            }
+
+            let totalWithModifier = total + fixedModifier;
+
+            const player =
+               document.getElementById("playerName").value ||
+               auth.currentUser.email;
+            if (fixedModifier != 0) {
+               fixedModifierHTML = `<span class="dice-icon modificador-fixe roll-animate">${fixedModifier >= 0 ? "+" : ""}${fixedModifier}</span>`;
+            }
+            const text = `
+              <strong>${player}</strong><br>
+              ${resultsHTML}
+              ${fixedModifierHTML}
+
+              <br><br>
+              <strong>Total: ${totalWithModifier}</strong>
+              `;
+
+            document.getElementById("result").innerHTML = text;
+
+            await addDoc(rollsRef, { text: text, time: Date.now() });
+         };
+         window.rollSingleDie = async function (sides) {
+            const roll = Math.floor(Math.random() * sides) + 1;
+            const player =
+               document.getElementById("playerName").value ||
+               auth.currentUser.email;
+
+            const resultHTML = `
+              <strong>${player}</strong><br><br>
+              <span class="dice-icon d${sides} roll-animate">${roll}</span>
+              <br><br>
+              <strong>Total: ${roll}</strong>
+              `;
+
+            document.getElementById("result").innerHTML = resultHTML;
+
+            await addDoc(rollsRef, {
+               text: resultHTML,
+               time: Date.now(),
+            });
+         };
+         const toggleDice = document.getElementById("toggleDice");
+         toggleDice.addEventListener("click", () => {
+            const container = document.getElementById("diceContainer");
+            const modifierDiv = document.getElementById("fixedModifier");
+
+            if (container.style.display === "none") {
+               container.style.display = "block";
+               modifierDiv.style.display = "block";
+               toggleDice.innerText = "▼ Daus clàssics";
+            } else {
+               container.style.display = "none";
+               modifierDiv.style.display = "none";
+               toggleDice.innerText = "► Daus clàssics";
+            }
+         });
+      </script>
    </body>
 </html>
